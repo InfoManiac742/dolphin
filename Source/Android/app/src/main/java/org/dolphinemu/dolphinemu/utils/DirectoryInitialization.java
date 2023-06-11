@@ -18,16 +18,17 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.preference.PreferenceManager;
 
+import org.dolphinemu.dolphinemu.NativeLibrary;
+import org.dolphinemu.dolphinemu.R;
+import org.dolphinemu.dolphinemu.activities.EmulationActivity;
+import org.dolphinemu.dolphinemu.features.settings.model.BooleanSetting;
+import org.dolphinemu.dolphinemu.features.settings.model.IntSetting;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-
-import org.dolphinemu.dolphinemu.NativeLibrary;
-import org.dolphinemu.dolphinemu.R;
-import org.dolphinemu.dolphinemu.features.settings.model.BooleanSetting;
-import org.dolphinemu.dolphinemu.features.settings.model.IntSetting;
 
 /**
  * A class that spawns its own thread in order perform initialization.
@@ -45,7 +46,6 @@ public final class DirectoryInitialization
   private static volatile boolean areDirectoriesAvailable = false;
   private static String userPath;
   private static String sysPath;
-  private static String driverPath;
   private static boolean isUsingLegacyUserDirectory = false;
 
   public enum DirectoryInitializationState
@@ -88,7 +88,8 @@ public final class DirectoryInitialization
     directoryState.postValue(DirectoryInitializationState.DOLPHIN_DIRECTORIES_INITIALIZED);
   }
 
-  @Nullable private static File getLegacyUserDirectoryPath()
+  @Nullable
+  private static File getLegacyUserDirectoryPath()
   {
     File externalPath = Environment.getExternalStorageDirectory();
     if (externalPath == null)
@@ -97,7 +98,8 @@ public final class DirectoryInitialization
     return new File(externalPath, "dolphin-emu");
   }
 
-  @Nullable public static File getUserDirectoryPath(Context context)
+  @Nullable
+  public static File getUserDirectoryPath(Context context)
   {
     if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()))
       return null;
@@ -105,8 +107,8 @@ public final class DirectoryInitialization
     isUsingLegacyUserDirectory =
             preferLegacyUserDirectory(context) && PermissionsHandler.hasWriteAccess(context);
 
-    return isUsingLegacyUserDirectory ? getLegacyUserDirectoryPath() :
-            context.getExternalFilesDir(null);
+    return isUsingLegacyUserDirectory ?
+            getLegacyUserDirectoryPath() : context.getExternalFilesDir(null);
   }
 
   private static boolean setDolphinUserDirectory(Context context)
@@ -151,19 +153,6 @@ public final class DirectoryInitialization
     // Let the native code know where the Sys directory is.
     sysPath = sysDirectory.getPath();
     SetSysDirectory(sysPath);
-
-    File driverDirectory = new File(context.getFilesDir(), "GPUDrivers");
-    driverDirectory.mkdirs();
-    File driverExtractedDir = new File(driverDirectory, "Extracted");
-    driverExtractedDir.mkdirs();
-    File driverTmpDir = new File(driverDirectory, "Tmp");
-    driverTmpDir.mkdirs();
-    File driverFileRedirectDir = new File(driverDirectory, "FileRedirect");
-    driverFileRedirectDir.mkdirs();
-
-    SetGpuDriverDirectories(driverDirectory.getPath(),
-            context.getApplicationInfo().nativeLibraryDir);
-    DirectoryInitialization.driverPath = driverExtractedDir.getAbsolutePath();
   }
 
   private static void deleteDirectoryRecursively(@NonNull final File file)
@@ -224,16 +213,6 @@ public final class DirectoryInitialization
     return sysPath;
   }
 
-  public static String getExtractedDriverDirectory()
-  {
-    if (!areDirectoriesAvailable)
-    {
-      throw new IllegalStateException(
-              "DirectoryInitialization must run before accessing the driver directory!");
-    }
-    return driverPath;
-  }
-
   public static File getGameListCache(Context context)
   {
     return new File(context.getExternalCacheDir(), "gamelist.cache");
@@ -256,14 +235,16 @@ public final class DirectoryInitialization
     }
     catch (IOException e)
     {
-      Log.error("[DirectoryInitialization] Failed to copy asset file: " + asset + e.getMessage());
+      Log.error("[DirectoryInitialization] Failed to copy asset file: " + asset +
+              e.getMessage());
     }
     return false;
   }
 
   private static void copyAssetFolder(String assetFolder, File outputFolder, Context context)
   {
-    Log.verbose("[DirectoryInitialization] Copying Folder " + assetFolder + " to " + outputFolder);
+    Log.verbose("[DirectoryInitialization] Copying Folder " + assetFolder + " to " +
+            outputFolder);
 
     try
     {
@@ -286,7 +267,8 @@ public final class DirectoryInitialization
           }
           createdFolder = true;
         }
-        copyAssetFolder(assetFolder + File.separator + file, new File(outputFolder, file), context);
+        copyAssetFolder(assetFolder + File.separator + file, new File(outputFolder, file),
+                context);
         copyAsset(assetFolder + File.separator + file, new File(outputFolder, file), context);
       }
     }
@@ -358,8 +340,8 @@ public final class DirectoryInitialization
   private static boolean preferLegacyUserDirectory(Context context)
   {
     return PermissionsHandler.isExternalStorageLegacy() &&
-            !PermissionsHandler.isWritePermissionDenied() && isExternalFilesDirEmpty(context) &&
-            legacyUserDirectoryExists();
+            !PermissionsHandler.isWritePermissionDenied() &&
+            isExternalFilesDirEmpty(context) && legacyUserDirectoryExists();
   }
 
   public static boolean isUsingLegacyUserDirectory()
@@ -407,6 +389,4 @@ public final class DirectoryInitialization
   }
 
   private static native void SetSysDirectory(String path);
-
-  private static native void SetGpuDriverDirectories(String path, String libPath);
 }
